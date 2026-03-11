@@ -147,13 +147,142 @@ function AuthScreen({ onAuth }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [pass, setPass] = useState("");
+  const [confirmPass, setConfirmPass] = useState("");
   const [err, setErr] = useState("");
   const [ok, setOk] = useState("");
   const [loading, setLoading] = useState(false);
 
+  // Blocked disposable/fake email domains
+  const BLOCKED_DOMAINS = [
+    "mailinator.com",
+    "guerrillamail.com",
+    "throwaway.email",
+    "tempmail.com",
+    "10minutemail.com",
+    "yopmail.com",
+    "trashmail.com",
+    "sharklasers.com",
+    "guerrillamailblock.com",
+    "grr.la",
+    "guerrillamail.info",
+    "guerrillamail.biz",
+    "guerrillamail.de",
+    "guerrillamail.net",
+    "guerrillamail.org",
+    "spam4.me",
+    "fakeinbox.com",
+    "maildrop.cc",
+    "dispostable.com",
+    "mailnull.com",
+    "spamgourmet.com",
+    "trashmail.me",
+    "trashmail.net",
+    "discard.email",
+    "tempr.email",
+    "temp-mail.org",
+    "getnada.com",
+    "anonaddy.com",
+    "mohmal.com",
+    "tempinbox.com",
+    "spambog.com",
+    "spamfree24.org",
+  ];
+
+  // Known legitimate domains (fast-pass, skip extra checks)
+  const KNOWN_DOMAINS = [
+    "gmail.com",
+    "yahoo.com",
+    "outlook.com",
+    "hotmail.com",
+    "icloud.com",
+    "protonmail.com",
+    "live.com",
+    "msn.com",
+    "me.com",
+    "mac.com",
+    "googlemail.com",
+    "ymail.com",
+    "aol.com",
+    "mail.com",
+    "zoho.com",
+    "rediffmail.com",
+    "yahoo.in",
+    "yahoo.co.uk",
+    "yahoo.co.in",
+  ];
+
+  const isValidEmailFormat = (e) => {
+    // Must have exactly one @, valid chars, proper TLD
+    const re = /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/;
+    if (!re.test(e)) return false;
+    const parts = e.split("@");
+    if (parts.length !== 2) return false;
+    const local = parts[0];
+    const domain = parts[1];
+    if (local.startsWith(".") || local.endsWith(".")) return false;
+    if (domain.startsWith(".") || domain.endsWith(".")) return false;
+    if (domain.indexOf("..") !== -1) return false;
+    if (!domain.includes(".")) return false;
+    const tld = domain.split(".").pop();
+    if (tld.length < 2) return false;
+    return true;
+  };
+
+  const validate = () => {
+    if (mode === "signup") {
+      if (!name.trim()) return "Please enter your full name.";
+      if (name.trim().length < 2) return "Name must be at least 2 characters.";
+      if (!email.trim()) return "Please enter your email address.";
+
+      const emailLower = email.trim().toLowerCase();
+      if (!isValidEmailFormat(emailLower))
+        return "Please enter a valid email address (e.g. name@example.com).";
+
+      const domain = emailLower.split("@")[1];
+      if (BLOCKED_DOMAINS.includes(domain))
+        return "Please use a genuine email address. Disposable emails are not allowed.";
+
+      // Extra checks for non-known domains
+      if (!KNOWN_DOMAINS.includes(domain)) {
+        const domainParts = domain.split(".");
+        if (domainParts.some((p) => p.length === 0))
+          return "Please enter a valid email address.";
+        // Reject clearly fake patterns like "asdf@asdf.asdf"
+        const suspicious =
+          /^[a-z]{2,6}\.[a-z]{2,6}$/.test(domain) &&
+          !["co.uk", "co.in", "com.au", "co.nz", "co.za", "com.br"].includes(
+            domain
+          );
+        if (suspicious && domain.split(".").every((p) => p.length <= 4))
+          return "Please use a genuine email address.";
+      }
+
+      if (!pass) return "Please enter a password.";
+      if (pass.length < 6) return "Password must be at least 6 characters.";
+      if (pass !== confirmPass) return "Passwords do not match.";
+    }
+    if (mode === "login") {
+      if (!email.trim()) return "Please enter your email.";
+      if (!isValidEmailFormat(email.trim().toLowerCase()))
+        return "Please enter a valid email address.";
+      if (!pass) return "Please enter your password.";
+    }
+    if (mode === "forgot") {
+      if (!email.trim()) return "Please enter your email address.";
+      if (!isValidEmailFormat(email.trim().toLowerCase()))
+        return "Please enter a valid email address (e.g. name@example.com).";
+    }
+    return null;
+  };
+
   const handle = async () => {
     setErr("");
     setOk("");
+    const validationErr = validate();
+    if (validationErr) {
+      setErr(validationErr);
+      return;
+    }
     setLoading(true);
     try {
       if (mode === "forgot") {
@@ -168,12 +297,23 @@ function AuthScreen({ onAuth }) {
           password: pass,
         });
         if (error) throw error;
-        if (data.user) {
+        if (data.user && data.user.confirmed_at) {
+          // Email confirmation is OFF — log straight in
           await supabase
             .from("profiles")
-            .upsert({ id: data.user.id, name: name || email.split("@")[0] });
-          onAuth(data.user, name || email.split("@")[0]);
-        } else setErr("Check your email to confirm, then sign in.");
+            .upsert({ id: data.user.id, name: name.trim() });
+          setOk("Account created! Welcome to FIT4LESS 🎉");
+          setTimeout(() => onAuth(data.user, name.trim()), 1200);
+        } else {
+          // Email confirmation is ON — save profile and show confirm screen
+          try {
+            await supabase.from("profiles").upsert({
+              id: data.session?.user?.id || data.user?.id,
+              name: name.trim(),
+            });
+          } catch (_) {}
+          setMode("confirm_email");
+        }
       } else {
         const { data, error } = await supabase.auth.signInWithPassword({
           email,
@@ -185,16 +325,121 @@ function AuthScreen({ onAuth }) {
           .select("name")
           .eq("id", data.user.id)
           .single();
-        onAuth(data.user, p?.name || email.split("@")[0]);
+        const displayName = p?.name || name.trim() || email.split("@")[0];
+        setOk(`Welcome back, ${displayName}! ✅`);
+        setTimeout(() => onAuth(data.user, displayName), 1000);
       }
     } catch (e) {
-      setErr(e.message);
+      // Make Supabase errors more user-friendly
+      const msg = e.message || "";
+      if (msg.includes("Invalid login credentials"))
+        setErr("Incorrect email or password. Please try again.");
+      else if (msg.includes("Email not confirmed"))
+        setErr("Please confirm your email first.");
+      else if (msg.includes("already registered"))
+        setErr("An account with this email already exists. Try signing in.");
+      else setErr(msg);
     } finally {
       setLoading(false);
     }
   };
 
-  // Forgot sent confirmation screen
+  const switchMode = (m) => {
+    setMode(m);
+    setErr("");
+    setOk("");
+    setName("");
+    setEmail("");
+    setPass("");
+    setConfirmPass("");
+  };
+
+  // Email confirmation pending screen
+  if (mode === "confirm_email")
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "center",
+          padding: "32px 24px",
+          background: C.bg,
+          fontFamily: body,
+          textAlign: "center",
+        }}
+      >
+        <div style={{ fontSize: 64, marginBottom: 16 }}>📧</div>
+        <h2
+          style={{
+            fontFamily: font,
+            fontSize: 32,
+            fontWeight: 900,
+            margin: "0 0 10px",
+            color: C.text,
+          }}
+        >
+          Confirm your email
+        </h2>
+        <p
+          style={{
+            color: C.muted,
+            fontSize: 14,
+            lineHeight: 1.8,
+            marginBottom: 8,
+          }}
+        >
+          We sent a confirmation link to
+        </p>
+        <p
+          style={{
+            color: C.accent,
+            fontWeight: 700,
+            fontSize: 16,
+            marginBottom: 16,
+          }}
+        >
+          {email}
+        </p>
+        <p
+          style={{
+            color: C.muted,
+            fontSize: 13,
+            lineHeight: 1.8,
+            marginBottom: 28,
+          }}
+        >
+          Click the link in the email to activate your account,
+          <br />
+          then come back here to sign in.
+        </p>
+        <div
+          style={{
+            background: C.card,
+            border: `1px solid ${C.border}`,
+            borderRadius: 12,
+            padding: "16px",
+            marginBottom: 24,
+            textAlign: "left",
+          }}
+        >
+          <p
+            style={{ color: C.muted, fontSize: 12, lineHeight: 1.8, margin: 0 }}
+          >
+            📌 <strong style={{ color: C.light }}>Can't find the email?</strong>{" "}
+            Check your spam/junk folder.
+            <br />⏱ The link expires in{" "}
+            <strong style={{ color: C.light }}>24 hours</strong>.<br />
+            ✉️ Make sure you used a real email address.
+          </p>
+        </div>
+        <Btn full onClick={() => switchMode("login")}>
+          ← Back to Sign In
+        </Btn>
+      </div>
+    );
+
+  // Forgot sent screen
   if (mode === "forgot_sent")
     return (
       <div
@@ -235,14 +480,7 @@ function AuthScreen({ onAuth }) {
           <br />
           Click the link in the email to set a new password.
         </p>
-        <Btn
-          full
-          onClick={() => {
-            setMode("login");
-            setErr("");
-            setEmail("");
-          }}
-        >
+        <Btn full onClick={() => switchMode("login")}>
           ← Back to Sign In
         </Btn>
       </div>
@@ -309,10 +547,7 @@ function AuthScreen({ onAuth }) {
           {["login", "signup"].map((m) => (
             <button
               key={m}
-              onClick={() => {
-                setMode(m);
-                setErr("");
-              }}
+              onClick={() => switchMode(m)}
               style={{
                 flex: 1,
                 background: mode === m ? C.card : "transparent",
@@ -338,31 +573,85 @@ function AuthScreen({ onAuth }) {
 
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {mode === "signup" && (
-          <Input
-            placeholder="Your name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
+          <div style={{ position: "relative" }}>
+            <Input
+              placeholder="Full name *"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+            {name.trim().length > 0 && name.trim().length < 2 && (
+              <p
+                style={{
+                  color: C.orange,
+                  fontSize: 11,
+                  margin: "-6px 0 0 4px",
+                }}
+              >
+                Name too short
+              </p>
+            )}
+          </div>
         )}
         <Input
-          placeholder="Email"
+          placeholder="Email address *"
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
         />
         {mode !== "forgot" && (
           <Input
-            placeholder="Password (min 6 chars)"
+            placeholder="Password (min 6 chars) *"
             type="password"
             value={pass}
             onChange={(e) => setPass(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && !confirmPass && handle()}
+          />
+        )}
+        {mode === "signup" && (
+          <Input
+            placeholder="Confirm password *"
+            type="password"
+            value={confirmPass}
+            onChange={(e) => setConfirmPass(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handle()}
           />
         )}
+
+        {/* Error message */}
         {err && (
-          <p style={{ color: C.orange, fontSize: 13, margin: 0 }}>{err}</p>
+          <div
+            style={{
+              background: `${C.orange}15`,
+              border: `1px solid ${C.orange}44`,
+              borderRadius: 8,
+              padding: "10px 14px",
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+            }}
+          >
+            <span style={{ fontSize: 15 }}>⚠️</span>
+            <p style={{ color: C.orange, fontSize: 13, margin: 0 }}>{err}</p>
+          </div>
         )}
-        {ok && <p style={{ color: C.accent, fontSize: 13, margin: 0 }}>{ok}</p>}
+
+        {/* Success message */}
+        {ok && (
+          <div
+            style={{
+              background: `${C.accent}15`,
+              border: `1px solid ${C.accent}44`,
+              borderRadius: 8,
+              padding: "10px 14px",
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+            }}
+          >
+            <span style={{ fontSize: 15 }}>✅</span>
+            <p style={{ color: C.accent, fontSize: 13, margin: 0 }}>{ok}</p>
+          </div>
+        )}
 
         <Btn full onClick={handle} disabled={loading}>
           {loading
@@ -374,14 +663,10 @@ function AuthScreen({ onAuth }) {
             : "Create Account →"}
         </Btn>
 
-        {/* Forgot password / back links */}
         <div style={{ textAlign: "center", marginTop: 4 }}>
           {mode === "login" ? (
             <button
-              onClick={() => {
-                setMode("forgot");
-                setErr("");
-              }}
+              onClick={() => switchMode("forgot")}
               style={{
                 background: "none",
                 border: "none",
@@ -396,10 +681,7 @@ function AuthScreen({ onAuth }) {
             </button>
           ) : mode === "forgot" ? (
             <button
-              onClick={() => {
-                setMode("login");
-                setErr("");
-              }}
+              onClick={() => switchMode("login")}
               style={{
                 background: "none",
                 border: "none",
@@ -1266,6 +1548,226 @@ function CompletionSummary({
   );
 }
 
+// ─── Activity Rings ───────────────────────────────────────────────────────────
+function ActivityRings({ logs }) {
+  const [animated, setAnimated] = useState(false);
+
+  useEffect(() => {
+    const t = setTimeout(() => setAnimated(true), 100);
+    return () => clearTimeout(t);
+  }, []);
+
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${String(
+    today.getMonth() + 1
+  ).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  const weekAgo = new Date(Date.now() - 7 * 86400000);
+
+  // Move ring — calories proxy: exercises done today × 12 kcal, goal 300
+  const todayLogs = logs.filter((l) => {
+    const d = new Date(l.logged_at);
+    const k = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
+      2,
+      "0"
+    )}-${String(d.getDate()).padStart(2, "0")}`;
+    return k === todayStr;
+  });
+  const moveVal = Math.min(
+    todayLogs.reduce((a, l) => a + (l.exercises_done || 0) * 12, 0),
+    600
+  );
+  const moveGoal = 300;
+
+  // Exercise ring — workout minutes today, goal 30
+  const exVal = Math.min(
+    todayLogs.reduce((a, l) => a + (l.duration_mins || 0), 0),
+    60
+  );
+  const exGoal = 30;
+
+  // Stand ring — days worked out this week, goal 5
+  const weekDays = new Set(
+    logs
+      .filter((l) => new Date(l.logged_at) >= weekAgo)
+      .map((l) => {
+        const d = new Date(l.logged_at);
+        return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+      })
+  );
+  const standVal = Math.min(weekDays.size, 7);
+  const standGoal = 5;
+
+  const rings = [
+    {
+      label: "Move",
+      value: moveVal,
+      goal: moveGoal,
+      unit: "CAL",
+      color: "#FF3B5C",
+      trackColor: "#3D0010",
+      r: 54,
+    },
+    {
+      label: "Exercise",
+      value: exVal,
+      goal: exGoal,
+      unit: "MIN",
+      color: "#00FF90",
+      trackColor: "#003D1F",
+      r: 40,
+    },
+    {
+      label: "Stand",
+      value: standVal,
+      goal: standGoal,
+      unit: "DAYS",
+      color: "#00CFFF",
+      trackColor: "#002233",
+      r: 26,
+    },
+  ];
+
+  const SIZE = 140;
+  const CX = SIZE / 2;
+  const STROKE = 10;
+
+  return (
+    <div
+      style={{
+        background: "#000",
+        borderRadius: 20,
+        padding: "20px",
+        marginBottom: 22,
+        display: "flex",
+        alignItems: "center",
+        gap: 20,
+        border: `1px solid #1A1A1A`,
+      }}
+    >
+      {/* SVG Rings */}
+      <div style={{ flexShrink: 0 }}>
+        <svg width={SIZE} height={SIZE}>
+          {rings.map(({ r, color, trackColor, value, goal }) => {
+            const circumference = 2 * Math.PI * r;
+            const pct = Math.min(value / goal, 1.1); // allow slight over 100
+            const offset = circumference * (1 - (animated ? pct : 0));
+            // Dot at the tip
+            const angle = (animated ? pct : 0) * 2 * Math.PI - Math.PI / 2;
+            const dotX = CX + r * Math.cos(angle);
+            const dotY = CX + r * Math.sin(angle);
+            return (
+              <g key={r}>
+                {/* Track */}
+                <circle
+                  cx={CX}
+                  cy={CX}
+                  r={r}
+                  fill="none"
+                  stroke={trackColor}
+                  strokeWidth={STROKE}
+                />
+                {/* Progress arc */}
+                <circle
+                  cx={CX}
+                  cy={CX}
+                  r={r}
+                  fill="none"
+                  stroke={color}
+                  strokeWidth={STROKE}
+                  strokeLinecap="round"
+                  strokeDasharray={circumference}
+                  strokeDashoffset={offset}
+                  transform={`rotate(-90 ${CX} ${CX})`}
+                  style={{
+                    transition: animated
+                      ? "stroke-dashoffset 1.2s cubic-bezier(0.4,0,0.2,1)"
+                      : "none",
+                  }}
+                />
+                {/* Tip glow dot */}
+                {animated && pct > 0.02 && (
+                  <circle
+                    cx={dotX}
+                    cy={dotY}
+                    r={STROKE / 2}
+                    fill={color}
+                    style={{
+                      filter: `drop-shadow(0 0 4px ${color})`,
+                      transition:
+                        "cx 1.2s cubic-bezier(0.4,0,0.2,1), cy 1.2s cubic-bezier(0.4,0,0.2,1)",
+                    }}
+                  />
+                )}
+              </g>
+            );
+          })}
+        </svg>
+      </div>
+
+      {/* Legend */}
+      <div
+        style={{ flex: 1, display: "flex", flexDirection: "column", gap: 12 }}
+      >
+        {rings.map(({ label, value, goal, unit, color }) => {
+          const pct = Math.min(Math.round((value / goal) * 100), 100);
+          return (
+            <div key={label}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "baseline",
+                  marginBottom: 3,
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <div
+                    style={{
+                      width: 8,
+                      height: 8,
+                      borderRadius: "50%",
+                      background: color,
+                      boxShadow: `0 0 6px ${color}`,
+                    }}
+                  />
+                  <span
+                    style={{
+                      fontSize: 12,
+                      fontWeight: 700,
+                      color: "#888",
+                      letterSpacing: "0.08em",
+                      textTransform: "uppercase",
+                    }}
+                  >
+                    {label}
+                  </span>
+                </div>
+                <span style={{ fontSize: 11, color: "#555" }}>{pct}%</span>
+              </div>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
+                <span
+                  style={{
+                    fontFamily: font,
+                    fontSize: 22,
+                    fontWeight: 900,
+                    color,
+                    lineHeight: 1,
+                  }}
+                >
+                  {value}
+                </span>
+                <span style={{ fontSize: 10, color: "#444" }}>
+                  / {goal} {unit}
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ─── Dashboard ────────────────────────────────────────────────────────────────
 function Dashboard({ user, userName, onPickExercises, onNav }) {
   const [logs, setLogs] = useState([]);
@@ -1353,6 +1855,8 @@ function Dashboard({ user, userName, onPickExercises, onNav }) {
       </div>
 
       <div style={{ padding: "0 20px" }}>
+        {/* Activity Rings */}
+        {!loading && <ActivityRings logs={logs} />}
         {/* Suggestion card */}
         <div
           style={{
@@ -2619,6 +3123,519 @@ function ProfileScreen({ user, userName, onLogout }) {
   );
 }
 
+// ─── Calendar Screen ──────────────────────────────────────────────────────────
+function CalendarScreen({ user }) {
+  const [logs, setLogs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [current, setCurrent] = useState(new Date());
+  const [selected, setSelected] = useState(null); // date string "YYYY-MM-DD"
+
+  useEffect(() => {
+    supabase
+      .from("workout_logs")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("logged_at", { ascending: false })
+      .then(({ data }) => {
+        setLogs(data || []);
+        setLoading(false);
+      });
+  }, [user.id]);
+
+  // Build a map of date → logs
+  const logsByDate = logs.reduce((acc, log) => {
+    const d = new Date(log.logged_at);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
+      2,
+      "0"
+    )}-${String(d.getDate()).padStart(2, "0")}`;
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(log);
+    return acc;
+  }, {});
+
+  const year = current.getFullYear();
+  const month = current.getMonth();
+  const today = new Date();
+  const todayKey = `${today.getFullYear()}-${String(
+    today.getMonth() + 1
+  ).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+
+  // Calendar grid
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const cells = [];
+  for (let i = 0; i < firstDay; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+
+  const monthName = current.toLocaleDateString("en-US", {
+    month: "long",
+    year: "numeric",
+  });
+
+  const prevMonth = () => setCurrent(new Date(year, month - 1, 1));
+  const nextMonth = () => setCurrent(new Date(year, month + 1, 1));
+
+  const selectedLogs = selected ? logsByDate[selected] || [] : [];
+
+  return (
+    <div style={{ paddingBottom: 80 }}>
+      <div style={{ padding: "24px 20px 0" }}>
+        <h2
+          style={{
+            fontFamily: font,
+            fontSize: 32,
+            fontWeight: 800,
+            margin: "0 0 20px",
+          }}
+        >
+          Calendar
+        </h2>
+
+        {/* Month navigator */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            marginBottom: 16,
+          }}
+        >
+          <button
+            onClick={prevMonth}
+            style={{
+              background: C.card,
+              border: `1px solid ${C.border}`,
+              borderRadius: 8,
+              color: C.text,
+              padding: "8px 14px",
+              cursor: "pointer",
+              fontSize: 16,
+              fontFamily: body,
+            }}
+          >
+            ‹
+          </button>
+          <span
+            style={{
+              fontFamily: font,
+              fontSize: 22,
+              fontWeight: 800,
+              color: C.text,
+            }}
+          >
+            {monthName}
+          </span>
+          <button
+            onClick={nextMonth}
+            style={{
+              background: C.card,
+              border: `1px solid ${C.border}`,
+              borderRadius: 8,
+              color: C.text,
+              padding: "8px 14px",
+              cursor: "pointer",
+              fontSize: 16,
+              fontFamily: body,
+            }}
+          >
+            ›
+          </button>
+        </div>
+
+        {/* Day labels */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(7, 1fr)",
+            gap: 4,
+            marginBottom: 6,
+          }}
+        >
+          {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((d) => (
+            <div
+              key={d}
+              style={{
+                textAlign: "center",
+                fontSize: 11,
+                color: C.muted,
+                fontWeight: 700,
+                padding: "4px 0",
+              }}
+            >
+              {d}
+            </div>
+          ))}
+        </div>
+
+        {/* Calendar grid */}
+        {loading ? (
+          <Spinner />
+        ) : (
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(7, 1fr)",
+              gap: 4,
+              marginBottom: 24,
+            }}
+          >
+            {cells.map((day, i) => {
+              if (!day) return <div key={`e-${i}`} />;
+              const key = `${year}-${String(month + 1).padStart(
+                2,
+                "0"
+              )}-${String(day).padStart(2, "0")}`;
+              const dayLogs = logsByDate[key] || [];
+              const hasLog = dayLogs.length > 0;
+              const isToday = key === todayKey;
+              const isSel = key === selected;
+              const types = [...new Set(dayLogs.map((l) => l.type))];
+
+              return (
+                <button
+                  key={key}
+                  onClick={() => setSelected(isSel ? null : key)}
+                  style={{
+                    background: isSel
+                      ? C.accent
+                      : isToday
+                      ? C.surface
+                      : hasLog
+                      ? `${C.accent}12`
+                      : "transparent",
+                    border: `1px solid ${
+                      isSel
+                        ? C.accent
+                        : isToday
+                        ? C.accent + "66"
+                        : hasLog
+                        ? C.accent + "33"
+                        : C.border
+                    }`,
+                    borderRadius: 10,
+                    padding: "6px 2px",
+                    cursor: "pointer",
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    gap: 3,
+                    transition: "all 0.15s",
+                    minHeight: 52,
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: 13,
+                      fontWeight: isToday || isSel ? 800 : 400,
+                      color: isSel
+                        ? "#000"
+                        : isToday
+                        ? C.accent
+                        : hasLog
+                        ? C.text
+                        : C.muted,
+                    }}
+                  >
+                    {day}
+                  </span>
+
+                  {/* Workout type dots */}
+                  {hasLog && (
+                    <div
+                      style={{
+                        display: "flex",
+                        gap: 2,
+                        flexWrap: "wrap",
+                        justifyContent: "center",
+                      }}
+                    >
+                      {types.slice(0, 3).map((t) => {
+                        const meta = CATEGORY_META[t] || CATEGORY_META.Custom;
+                        return (
+                          <div
+                            key={t}
+                            style={{
+                              width: 6,
+                              height: 6,
+                              borderRadius: "50%",
+                              background: isSel ? "#00000066" : meta.color,
+                            }}
+                          />
+                        );
+                      })}
+                    </div>
+                  )}
+                  {hasLog && (
+                    <span
+                      style={{
+                        fontSize: 9,
+                        color: isSel ? "#00000099" : C.muted,
+                      }}
+                    >
+                      {dayLogs.length > 1 ? `${dayLogs.length}×` : ""}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Selected day detail */}
+        {selected && (
+          <div style={{ animation: "fadeUp 0.2s ease" }}>
+            <h4
+              style={{
+                color: C.muted,
+                fontSize: 11,
+                letterSpacing: "0.15em",
+                textTransform: "uppercase",
+                margin: "0 0 12px",
+              }}
+            >
+              {new Date(selected + "T12:00:00").toLocaleDateString("en-US", {
+                weekday: "long",
+                month: "long",
+                day: "numeric",
+              })}
+            </h4>
+
+            {selectedLogs.length === 0 ? (
+              <div
+                style={{
+                  background: C.card,
+                  border: `1px solid ${C.border}`,
+                  borderRadius: 12,
+                  padding: "20px",
+                  textAlign: "center",
+                }}
+              >
+                <div style={{ fontSize: 32, marginBottom: 8 }}>😴</div>
+                <div style={{ color: C.muted, fontSize: 14 }}>Rest day</div>
+              </div>
+            ) : (
+              selectedLogs.map((log, i) => {
+                const meta = CATEGORY_META[log.type] || CATEGORY_META.Custom;
+                const exList = log.completed_exercises || [];
+                const status = completionStatus(exList);
+                const doneCnt = exList.filter((e) => e.completed).length;
+
+                return (
+                  <div
+                    key={i}
+                    style={{
+                      background: C.card,
+                      border: `1px solid ${
+                        status ? status.color + "44" : C.border
+                      }`,
+                      borderLeft: `4px solid ${
+                        status ? status.color : meta.color
+                      }`,
+                      borderRadius: 12,
+                      padding: "16px",
+                      marginBottom: 10,
+                    }}
+                  >
+                    {/* Header */}
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        marginBottom: 10,
+                      }}
+                    >
+                      <div>
+                        <div
+                          style={{
+                            fontFamily: font,
+                            fontSize: 22,
+                            fontWeight: 800,
+                          }}
+                        >
+                          {meta.emoji} {log.type}
+                        </div>
+                        <div
+                          style={{ color: C.muted, fontSize: 12, marginTop: 2 }}
+                        >
+                          {log.duration_mins} min
+                        </div>
+                      </div>
+                      {status && (
+                        <span
+                          style={{
+                            background: status.bg,
+                            border: `1px solid ${status.color}55`,
+                            color: status.color,
+                            borderRadius: 99,
+                            fontSize: 11,
+                            fontWeight: 700,
+                            padding: "3px 10px",
+                          }}
+                        >
+                          {status.label} · {status.pct}%
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Progress bar */}
+                    {status && (
+                      <div style={{ marginBottom: 12 }}>
+                        <div
+                          style={{
+                            background: C.surface,
+                            borderRadius: 99,
+                            height: 4,
+                            overflow: "hidden",
+                          }}
+                        >
+                          <div
+                            style={{
+                              height: "100%",
+                              borderRadius: 99,
+                              width: `${status.pct}%`,
+                              background:
+                                status.pct === 100
+                                  ? "linear-gradient(90deg, #00D4AA, #00FF88)"
+                                  : `linear-gradient(90deg, ${status.color}, ${status.color}88)`,
+                            }}
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Exercise list */}
+                    {exList.length > 0 && (
+                      <div
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: 6,
+                        }}
+                      >
+                        {exList.map((ex, j) => (
+                          <div
+                            key={j}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 8,
+                              background: ex.completed
+                                ? "#00D4AA10"
+                                : "#EF444408",
+                              border: `1px solid ${
+                                ex.completed ? "#00D4AA33" : "#EF444422"
+                              }`,
+                              borderRadius: 7,
+                              padding: "8px 10px",
+                            }}
+                          >
+                            <div
+                              style={{
+                                width: 18,
+                                height: 18,
+                                borderRadius: 4,
+                                flexShrink: 0,
+                                background: ex.completed
+                                  ? "#00D4AA"
+                                  : "transparent",
+                                border: `2px solid ${
+                                  ex.completed ? "#00D4AA" : "#EF4444"
+                                }`,
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                fontSize: 10,
+                                color: "#000",
+                                fontWeight: 900,
+                              }}
+                            >
+                              {ex.completed ? "✓" : ""}
+                            </div>
+                            <div style={{ flex: 1 }}>
+                              <span
+                                style={{
+                                  fontSize: 13,
+                                  fontWeight: 600,
+                                  color: ex.completed ? C.text : C.muted,
+                                  textDecoration: ex.completed
+                                    ? "none"
+                                    : "line-through",
+                                }}
+                              >
+                                {ex.name}
+                              </span>
+                              <span
+                                style={{
+                                  fontSize: 11,
+                                  color: C.muted,
+                                  marginLeft: 6,
+                                }}
+                              >
+                                {ex.sets}×{ex.reps}
+                              </span>
+                            </div>
+                            {!ex.completed && (
+                              <span
+                                style={{
+                                  fontSize: 10,
+                                  color: "#EF4444",
+                                  fontWeight: 700,
+                                }}
+                              >
+                                SKIPPED
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
+        )}
+
+        {/* Legend */}
+        {!selected && !loading && (
+          <div
+            style={{ display: "flex", gap: 16, flexWrap: "wrap", marginTop: 8 }}
+          >
+            {Object.entries(CATEGORY_META)
+              .filter(([k]) => k !== "Custom")
+              .map(([type, meta]) => {
+                const hasAny = Object.values(logsByDate)
+                  .flat()
+                  .some((l) => l.type === type);
+                if (!hasAny) return null;
+                return (
+                  <div
+                    key={type}
+                    style={{ display: "flex", alignItems: "center", gap: 5 }}
+                  >
+                    <div
+                      style={{
+                        width: 8,
+                        height: 8,
+                        borderRadius: "50%",
+                        background: meta.color,
+                      }}
+                    />
+                    <span style={{ fontSize: 11, color: C.muted }}>
+                      {meta.emoji} {type}
+                    </span>
+                  </div>
+                );
+              })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Nav ──────────────────────────────────────────────────────────────────────
 function NavBar({ active, onNav }) {
   return (
@@ -2639,6 +3656,7 @@ function NavBar({ active, onNav }) {
       {[
         { id: "home", icon: "🏠", label: "Home" },
         { id: "custom", icon: "⚡", label: "Mine" },
+        { id: "calendar", icon: "📅", label: "Calendar" },
         { id: "log", icon: "📋", label: "History" },
         { id: "profile", icon: "👤", label: "Profile" },
       ].map((tab) => (
@@ -2835,6 +3853,7 @@ export default function App() {
               onPickExercises={handlePickExercises}
             />
           )}
+          {screen === "calendar" && <CalendarScreen user={user} />}
           {screen === "log" && <LogScreen user={user} />}
           {screen === "profile" && (
             <ProfileScreen
