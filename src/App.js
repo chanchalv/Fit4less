@@ -141,278 +141,28 @@ const Spinner = () => (
   </div>
 );
 
-// ─── Setup Guide ──────────────────────────────────────────────────────────────
-function SetupGuide({ onDone }) {
-  const [step, setStep] = useState(0);
-  const steps = [
-    {
-      title: "Create a free Supabase project",
-      body: "Go to supabase.com → 'Start for free' → sign up → 'New Project'. Pick any name and a strong password. Wait ~2 min for it to boot.",
-      action: "I created the project →",
-      link: "https://supabase.com",
-      linkLabel: "Open Supabase →",
-    },
-    {
-      title: "Run the database SQL",
-      body: "Supabase → SQL Editor → New query → paste the SQL below → Run.",
-      sql: `create table profiles (
-  id uuid references auth.users on delete cascade primary key,
-  name text, created_at timestamptz default now()
-);
-alter table profiles enable row level security;
-create policy "own profile" on profiles for all using (auth.uid() = id);
-
-create table workout_logs (
-  id uuid default gen_random_uuid() primary key,
-  user_id uuid references auth.users on delete cascade,
-  type text not null,
-  exercises_done int default 0,
-  duration_mins int default 0,
-  completed_exercises jsonb default '[]',
-  logged_at timestamptz default now()
-);
-alter table workout_logs enable row level security;
-create policy "own logs" on workout_logs for all using (auth.uid() = user_id);
-
-create table custom_workouts (
-  id uuid default gen_random_uuid() primary key,
-  user_id uuid references auth.users on delete cascade,
-  name text not null, description text,
-  is_public boolean default false,
-  created_at timestamptz default now()
-);
-alter table custom_workouts enable row level security;
-create policy "owner manage" on custom_workouts for all using (auth.uid() = user_id);
-create policy "public view" on custom_workouts for select using (is_public = true);
-
-create table custom_exercises (
-  id uuid default gen_random_uuid() primary key,
-  workout_id uuid references custom_workouts on delete cascade,
-  name text not null, sets int default 3,
-  reps text default '10-12', muscle text default 'General',
-  notes text, sort_order int default 0
-);
-alter table custom_exercises enable row level security;
-create policy "owner manage ex" on custom_exercises for all using (
-  exists (select 1 from custom_workouts where id = workout_id and user_id = auth.uid())
-);
-create policy "public view ex" on custom_exercises for select using (
-  exists (select 1 from custom_workouts where id = workout_id and is_public = true)
-);`,
-      action: "SQL ran successfully →",
-    },
-    {
-      title: "Paste your API keys",
-      body: "Supabase → Settings (⚙️) → API. Copy Project URL and anon public key into supabaseClient.js.",
-      code: `const SUPABASE_URL = 'https://xxxx.supabase.co'\nconst SUPABASE_ANON_KEY = 'eyJhbGci...'`,
-      action: "Keys are set — let's go! 🚀",
-    },
-  ];
-  const cur = steps[step];
-  return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: C.bg,
-        padding: "24px 20px",
-        fontFamily: body,
-      }}
-    >
-      <div style={{ maxWidth: 480, margin: "0 auto" }}>
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 12,
-            marginBottom: 28,
-          }}
-        >
-          <div
-            style={{
-              width: 44,
-              height: 44,
-              borderRadius: 12,
-              background: `linear-gradient(135deg, ${C.accent}, ${C.orange})`,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: 20,
-            }}
-          >
-            ⚡
-          </div>
-          <div>
-            <div
-              style={{
-                fontFamily: font,
-                fontSize: 26,
-                fontWeight: 900,
-                color: C.text,
-              }}
-            >
-              FORGEFIT
-            </div>
-            <div style={{ fontSize: 12, color: C.muted }}>
-              Supabase Setup Guide
-            </div>
-          </div>
-        </div>
-        <div style={{ display: "flex", gap: 6, marginBottom: 28 }}>
-          {steps.map((_, i) => (
-            <div
-              key={i}
-              style={{
-                flex: 1,
-                height: 4,
-                borderRadius: 99,
-                background: i <= step ? C.accent : C.border,
-                transition: "background 0.3s",
-              }}
-            />
-          ))}
-        </div>
-        <div
-          style={{
-            background: C.card,
-            border: `1px solid ${C.border}`,
-            borderRadius: 14,
-            padding: "24px",
-            marginBottom: 16,
-            borderTop: `2px solid ${C.accent}`,
-          }}
-        >
-          <div
-            style={{
-              fontSize: 11,
-              color: C.accent,
-              letterSpacing: "0.15em",
-              textTransform: "uppercase",
-              marginBottom: 8,
-            }}
-          >
-            Step {step + 1} of {steps.length}
-          </div>
-          <h2
-            style={{
-              fontFamily: font,
-              fontSize: 26,
-              fontWeight: 800,
-              margin: "0 0 14px",
-              color: C.text,
-            }}
-          >
-            {cur.title}
-          </h2>
-          <p
-            style={{
-              color: C.light,
-              fontSize: 14,
-              lineHeight: 1.7,
-              margin: "0 0 16px",
-            }}
-          >
-            {cur.body}
-          </p>
-          {cur.link && (
-            <a
-              href={cur.link}
-              target="_blank"
-              rel="noreferrer"
-              style={{
-                display: "inline-block",
-                background: C.accentDim,
-                border: `1px solid ${C.accent}44`,
-                color: C.accent,
-                borderRadius: 6,
-                padding: "8px 16px",
-                fontSize: 13,
-                textDecoration: "none",
-                marginBottom: 16,
-                fontWeight: 700,
-              }}
-            >
-              {cur.linkLabel}
-            </a>
-          )}
-          {cur.sql && (
-            <pre
-              style={{
-                background: "#050810",
-                border: `1px solid ${C.border}`,
-                borderRadius: 8,
-                padding: "14px",
-                fontSize: 11,
-                color: "#7DD3FC",
-                overflowX: "auto",
-                marginBottom: 16,
-                maxHeight: 240,
-                overflowY: "auto",
-                lineHeight: 1.6,
-              }}
-            >
-              {cur.sql}
-            </pre>
-          )}
-          {cur.code && (
-            <pre
-              style={{
-                background: "#050810",
-                border: `1px solid ${C.border}`,
-                borderRadius: 8,
-                padding: "14px",
-                fontSize: 12,
-                color: "#7DD3FC",
-                marginBottom: 16,
-                lineHeight: 1.6,
-              }}
-            >
-              {cur.code}
-            </pre>
-          )}
-          <Btn
-            full
-            onClick={() =>
-              step < steps.length - 1 ? setStep((s) => s + 1) : onDone()
-            }
-          >
-            {cur.action}
-          </Btn>
-        </div>
-        <p style={{ color: C.muted, fontSize: 12, textAlign: "center" }}>
-          Already set up?{" "}
-          <button
-            onClick={onDone}
-            style={{
-              background: "none",
-              border: "none",
-              color: C.accent,
-              cursor: "pointer",
-              fontSize: 12,
-              fontFamily: body,
-            }}
-          >
-            Skip →
-          </button>
-        </p>
-      </div>
-    </div>
-  );
-}
-
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 function AuthScreen({ onAuth }) {
-  const [mode, setMode] = useState("login");
+  const [mode, setMode] = useState("login"); // login | signup | forgot | forgot_sent
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [pass, setPass] = useState("");
   const [err, setErr] = useState("");
+  const [ok, setOk] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handle = async () => {
     setErr("");
+    setOk("");
     setLoading(true);
     try {
-      if (mode === "signup") {
+      if (mode === "forgot") {
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: window.location.origin + "?reset=1",
+        });
+        if (error) throw error;
+        setMode("forgot_sent");
+      } else if (mode === "signup") {
         const { data, error } = await supabase.auth.signUp({
           email,
           password: pass,
@@ -443,6 +193,60 @@ function AuthScreen({ onAuth }) {
       setLoading(false);
     }
   };
+
+  // Forgot sent confirmation screen
+  if (mode === "forgot_sent")
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "center",
+          padding: "32px 24px",
+          background: C.bg,
+          fontFamily: body,
+          textAlign: "center",
+        }}
+      >
+        <div style={{ fontSize: 56, marginBottom: 16 }}>📬</div>
+        <h2
+          style={{
+            fontFamily: font,
+            fontSize: 30,
+            fontWeight: 900,
+            margin: "0 0 10px",
+            color: C.text,
+          }}
+        >
+          Check your email
+        </h2>
+        <p
+          style={{
+            color: C.muted,
+            fontSize: 14,
+            lineHeight: 1.7,
+            marginBottom: 28,
+          }}
+        >
+          We sent a password reset link to
+          <br />
+          <span style={{ color: C.accent, fontWeight: 700 }}>{email}</span>.
+          <br />
+          Click the link in the email to set a new password.
+        </p>
+        <Btn
+          full
+          onClick={() => {
+            setMode("login");
+            setErr("");
+            setEmail("");
+          }}
+        >
+          ← Back to Sign In
+        </Btn>
+      </div>
+    );
 
   return (
     <div
@@ -483,47 +287,55 @@ function AuthScreen({ onAuth }) {
             color: C.text,
           }}
         >
-          FORGEFIT
+          Fit4less
         </h1>
         <p style={{ color: C.muted, fontSize: 13, margin: "6px 0 0" }}>
-          Your AI-powered workout companion
+          {mode === "forgot"
+            ? "Reset your password"
+            : "Your AI-powered workout companion"}
         </p>
       </div>
-      <div
-        style={{
-          display: "flex",
-          background: C.surface,
-          borderRadius: 10,
-          padding: 4,
-          marginBottom: 20,
-        }}
-      >
-        {["login", "signup"].map((m) => (
-          <button
-            key={m}
-            onClick={() => {
-              setMode(m);
-              setErr("");
-            }}
-            style={{
-              flex: 1,
-              background: mode === m ? C.card : "transparent",
-              border:
-                mode === m ? `1px solid ${C.border}` : "1px solid transparent",
-              borderRadius: 8,
-              padding: "10px",
-              color: mode === m ? C.text : C.muted,
-              fontWeight: 700,
-              cursor: "pointer",
-              fontSize: 14,
-              fontFamily: body,
-              transition: "all 0.2s",
-            }}
-          >
-            {m === "login" ? "Sign In" : "Create Account"}
-          </button>
-        ))}
-      </div>
+
+      {mode !== "forgot" && (
+        <div
+          style={{
+            display: "flex",
+            background: C.surface,
+            borderRadius: 10,
+            padding: 4,
+            marginBottom: 20,
+          }}
+        >
+          {["login", "signup"].map((m) => (
+            <button
+              key={m}
+              onClick={() => {
+                setMode(m);
+                setErr("");
+              }}
+              style={{
+                flex: 1,
+                background: mode === m ? C.card : "transparent",
+                border:
+                  mode === m
+                    ? `1px solid ${C.border}`
+                    : "1px solid transparent",
+                borderRadius: 8,
+                padding: "10px",
+                color: mode === m ? C.text : C.muted,
+                fontWeight: 700,
+                cursor: "pointer",
+                fontSize: 14,
+                fontFamily: body,
+                transition: "all 0.2s",
+              }}
+            >
+              {m === "login" ? "Sign In" : "Create Account"}
+            </button>
+          ))}
+        </div>
+      )}
+
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {mode === "signup" && (
           <Input
@@ -538,23 +350,69 @@ function AuthScreen({ onAuth }) {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
         />
-        <Input
-          placeholder="Password (min 6 chars)"
-          type="password"
-          value={pass}
-          onChange={(e) => setPass(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && handle()}
-        />
+        {mode !== "forgot" && (
+          <Input
+            placeholder="Password (min 6 chars)"
+            type="password"
+            value={pass}
+            onChange={(e) => setPass(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handle()}
+          />
+        )}
         {err && (
           <p style={{ color: C.orange, fontSize: 13, margin: 0 }}>{err}</p>
         )}
+        {ok && <p style={{ color: C.accent, fontSize: 13, margin: 0 }}>{ok}</p>}
+
         <Btn full onClick={handle} disabled={loading}>
           {loading
             ? "Please wait…"
+            : mode === "forgot"
+            ? "Send Reset Link →"
             : mode === "login"
             ? "Sign In →"
             : "Create Account →"}
         </Btn>
+
+        {/* Forgot password / back links */}
+        <div style={{ textAlign: "center", marginTop: 4 }}>
+          {mode === "login" ? (
+            <button
+              onClick={() => {
+                setMode("forgot");
+                setErr("");
+              }}
+              style={{
+                background: "none",
+                border: "none",
+                color: C.muted,
+                cursor: "pointer",
+                fontSize: 13,
+                fontFamily: body,
+                textDecoration: "underline",
+              }}
+            >
+              Forgot password?
+            </button>
+          ) : mode === "forgot" ? (
+            <button
+              onClick={() => {
+                setMode("login");
+                setErr("");
+              }}
+              style={{
+                background: "none",
+                border: "none",
+                color: C.muted,
+                cursor: "pointer",
+                fontSize: 13,
+                fontFamily: body,
+              }}
+            >
+              ← Back to Sign In
+            </button>
+          ) : null}
+        </div>
       </div>
     </div>
   );
@@ -787,12 +645,136 @@ function ExercisePicker({ type, allExercises, onStart, onBack }) {
   );
 }
 
+// ─── Rest Timer Modal ────────────────────────────────────────────────────────
+function RestTimer({ duration, onDone, onSkip }) {
+  const [left, setLeft] = useState(duration);
+
+  useEffect(() => {
+    if (left <= 0) {
+      onDone();
+      return;
+    }
+    const t = setTimeout(() => setLeft((l) => l - 1), 1000);
+    return () => clearTimeout(t);
+  }, [left, onDone]);
+
+  const pct = Math.round(((duration - left) / duration) * 100);
+  const mins = Math.floor(left / 60);
+  const secs = String(left % 60).padStart(2, "0");
+  const circumference = 2 * Math.PI * 54;
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 50,
+        background: "rgba(8,12,16,0.92)",
+        backdropFilter: "blur(8px)",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        fontFamily: body,
+      }}
+    >
+      <div
+        style={{
+          fontSize: 13,
+          color: C.muted,
+          letterSpacing: "0.15em",
+          textTransform: "uppercase",
+          marginBottom: 24,
+        }}
+      >
+        Rest Timer
+      </div>
+
+      {/* Circular progress */}
+      <div
+        style={{
+          position: "relative",
+          width: 140,
+          height: 140,
+          marginBottom: 28,
+        }}
+      >
+        <svg width="140" height="140" style={{ transform: "rotate(-90deg)" }}>
+          <circle
+            cx="70"
+            cy="70"
+            r="54"
+            fill="none"
+            stroke={C.border}
+            strokeWidth="8"
+          />
+          <circle
+            cx="70"
+            cy="70"
+            r="54"
+            fill="none"
+            stroke={left <= 5 ? "#EF4444" : C.accent}
+            strokeWidth="8"
+            strokeLinecap="round"
+            strokeDasharray={circumference}
+            strokeDashoffset={circumference * (1 - pct / 100)}
+            style={{ transition: "stroke-dashoffset 0.9s linear, stroke 0.3s" }}
+          />
+        </svg>
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <div
+            style={{
+              fontFamily: font,
+              fontSize: 42,
+              fontWeight: 900,
+              color: left <= 5 ? "#EF4444" : C.text,
+              lineHeight: 1,
+            }}
+          >
+            {mins > 0 ? `${mins}:${secs}` : left}
+          </div>
+          <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>
+            seconds
+          </div>
+        </div>
+      </div>
+
+      <p style={{ color: C.muted, fontSize: 13, marginBottom: 24 }}>
+        Rest up — next set incoming
+      </p>
+
+      <div style={{ display: "flex", gap: 10 }}>
+        <Btn ghost small onClick={onSkip}>
+          Skip Rest
+        </Btn>
+        <Btn small onClick={onDone}>
+          Start Now →
+        </Btn>
+      </div>
+    </div>
+  );
+}
+
 // ─── STEP 2: Active Workout ───────────────────────────────────────────────────
+const REST_DURATIONS = [30, 60, 90, 120];
+
 function ActiveWorkout({ type, exercises, user, onComplete, onBack }) {
   const [checked, setChecked] = useState({});
   const [start] = useState(Date.now());
   const [elapsed, setElapsed] = useState(0);
   const [saving, setSaving] = useState(false);
+  const [restActive, setRestActive] = useState(false);
+  const [restDuration, setRestDuration] = useState(60);
+  const [lastChecked, setLastChecked] = useState(null);
   const meta = CATEGORY_META[type] || CATEGORY_META.Custom;
 
   useEffect(() => {
@@ -810,6 +792,15 @@ function ActiveWorkout({ type, exercises, user, onComplete, onBack }) {
     ? Math.round((doneCount / exercises.length) * 100)
     : 0;
   const allDone = doneCount === exercises.length;
+
+  const toggleExercise = (i) => {
+    const nowOn = !checked[i];
+    setChecked((c) => ({ ...c, [i]: nowOn }));
+    if (nowOn) {
+      setLastChecked(i);
+      setRestActive(true);
+    }
+  };
 
   const finish = async () => {
     setSaving(true);
@@ -836,7 +827,15 @@ function ActiveWorkout({ type, exercises, user, onComplete, onBack }) {
 
   return (
     <div style={{ paddingBottom: 100 }}>
-      {/* Sticky header with timer + progress */}
+      {restActive && (
+        <RestTimer
+          duration={restDuration}
+          onDone={() => setRestActive(false)}
+          onSkip={() => setRestActive(false)}
+        />
+      )}
+
+      {/* Sticky header */}
       <div
         style={{
           background: C.surface,
@@ -902,7 +901,6 @@ function ActiveWorkout({ type, exercises, user, onComplete, onBack }) {
             <div style={{ fontSize: 10, color: C.muted }}>done</div>
           </div>
         </div>
-        {/* Progress bar */}
         <div
           style={{
             background: C.card,
@@ -929,17 +927,53 @@ function ActiveWorkout({ type, exercises, user, onComplete, onBack }) {
       </div>
 
       <div style={{ padding: "16px 20px" }}>
-        <h2
+        <div
           style={{
-            fontFamily: font,
-            fontSize: 32,
-            fontWeight: 900,
-            margin: "0 0 16px",
-            letterSpacing: "-0.01em",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            marginBottom: 16,
           }}
         >
-          {meta.emoji} {type} Workout
-        </h2>
+          <h2
+            style={{
+              fontFamily: font,
+              fontSize: 28,
+              fontWeight: 900,
+              margin: 0,
+              letterSpacing: "-0.01em",
+            }}
+          >
+            {meta.emoji} {type}
+          </h2>
+          {/* Rest duration selector */}
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ fontSize: 11, color: C.muted }}>Rest:</span>
+            <div style={{ display: "flex", gap: 4 }}>
+              {REST_DURATIONS.map((d) => (
+                <button
+                  key={d}
+                  onClick={() => setRestDuration(d)}
+                  style={{
+                    background: restDuration === d ? C.accent : C.card,
+                    border: `1px solid ${
+                      restDuration === d ? C.accent : C.border
+                    }`,
+                    borderRadius: 6,
+                    padding: "4px 8px",
+                    color: restDuration === d ? "#000" : C.muted,
+                    fontSize: 11,
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    fontFamily: body,
+                  }}
+                >
+                  {d}s
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
           {exercises.map((ex, i) => {
@@ -947,7 +981,7 @@ function ActiveWorkout({ type, exercises, user, onComplete, onBack }) {
             return (
               <button
                 key={i}
-                onClick={() => setChecked((c) => ({ ...c, [i]: !on }))}
+                onClick={() => toggleExercise(i)}
                 style={{
                   background: on ? `${C.accent}12` : C.card,
                   border: `1px solid ${on ? C.accent : C.border}`,
@@ -962,7 +996,6 @@ function ActiveWorkout({ type, exercises, user, onComplete, onBack }) {
                   opacity: on ? 0.75 : 1,
                 }}
               >
-                {/* Checkbox */}
                 <div
                   style={{
                     width: 26,
@@ -983,7 +1016,6 @@ function ActiveWorkout({ type, exercises, user, onComplete, onBack }) {
                 >
                   {on ? "✓" : ""}
                 </div>
-                {/* Exercise info */}
                 <div style={{ flex: 1 }}>
                   <div
                     style={{
@@ -1007,7 +1039,6 @@ function ActiveWorkout({ type, exercises, user, onComplete, onBack }) {
         </div>
       </div>
 
-      {/* Finish button */}
       <div
         style={{
           position: "fixed",
@@ -2647,7 +2678,6 @@ function NavBar({ active, onNav }) {
 
 // ─── Root ─────────────────────────────────────────────────────────────────────
 export default function App() {
-  const [setupDone, setSetupDone] = useState(false);
   const [user, setUser] = useState(null);
   const [userName, setUserName] = useState("");
   const [screen, setScreen] = useState("home");
@@ -2670,7 +2700,6 @@ export default function App() {
           .single();
         setUser(session.user);
         setUserName(p?.name || session.user.email.split("@")[0]);
-        setSetupDone(true);
       }
       setAuthLoading(false);
     });
@@ -2736,7 +2765,6 @@ export default function App() {
         <Spinner />
       </div>
     );
-  if (!setupDone) return <SetupGuide onDone={() => setSetupDone(true)} />;
   if (!user) return <AuthScreen onAuth={handleAuth} />;
 
   return (
