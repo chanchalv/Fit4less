@@ -287,7 +287,7 @@ function AuthScreen({ onAuth }) {
             color: C.text,
           }}
         >
-          Fit4less
+          FIT4LESS
         </h1>
         <p style={{ color: C.muted, fontSize: 13, margin: "6px 0 0" }}>
           {mode === "forgot"
