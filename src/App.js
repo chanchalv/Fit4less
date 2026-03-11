@@ -2,21 +2,21 @@ import { useState, useEffect, useCallback } from "react";
 import { supabase } from "./supabaseClient";
 import { BUILT_IN_EXERCISES, CATEGORY_META, SUGGESTIONS } from "./data";
 
-// ─── Theme ────────────────────────────────────────────────────────────────────
+// ─── Theme (Soft Light) ───────────────────────────────────────────────────────
 const C = {
-  bg: "#080C10",
-  surface: "#0F1419",
-  card: "#141B22",
-  border: "#1E2832",
-  accent: "#00D4AA",
-  accentDim: "#00D4AA18",
-  orange: "#FF7043",
-  purple: "#8B5CF6",
-  pink: "#EC4899",
-  blue: "#3B82F6",
-  text: "#E8EDF2",
-  muted: "#4A5568",
-  light: "#8899AA",
+  bg: "#d7d6c5",
+  surface: "#F7FBF9",
+  card: "#FFFFFF",
+  border: "#D4E6DC",
+  accent: "#00A880",
+  accentDim: "#00A88015",
+  orange: "#F4622A",
+  purple: "#7C3AED",
+  pink: "#DB2777",
+  blue: "#2563EB",
+  text: "#1A2E25",
+  muted: "#6B7C74",
+  light: "#8FA99D",
 };
 const font = "'Barlow Condensed', 'Impact', sans-serif";
 const body = "'DM Sans', 'Segoe UI', sans-serif";
@@ -49,7 +49,7 @@ const Btn = ({ children, onClick, full, ghost, danger, small, disabled }) => {
     : ghost
     ? "transparent"
     : h
-    ? "#00FFCC"
+    ? "#00C496"
     : C.accent;
   return (
     <button
@@ -60,7 +60,7 @@ const Btn = ({ children, onClick, full, ghost, danger, small, disabled }) => {
       style={{
         width: full ? "100%" : "auto",
         background: bg,
-        color: ghost ? C.light : danger ? "#fff" : "#000",
+        color: ghost ? C.muted : danger ? "#fff" : "#fff",
         border: ghost ? `1px solid ${C.border}` : "none",
         borderRadius: 8,
         padding: small ? "8px 14px" : "13px 22px",
@@ -71,7 +71,7 @@ const Btn = ({ children, onClick, full, ghost, danger, small, disabled }) => {
         letterSpacing: "0.02em",
         transition: "all 0.15s",
         opacity: disabled ? 0.4 : 1,
-        boxShadow: !ghost && !danger && h ? `0 0 24px ${C.accent}55` : "none",
+        boxShadow: !ghost && !danger && h ? `0 0 12px ${C.accent}44` : "none",
       }}
     >
       {children}
@@ -87,8 +87,8 @@ const Input = ({ placeholder, value, onChange, type = "text", onKeyDown }) => (
     type={type}
     onKeyDown={onKeyDown}
     style={{
-      background: C.surface,
-      border: `1px solid ${C.border}`,
+      background: "#F2F9F5",
+      border: `1.5px solid ${C.border}`,
       borderRadius: 8,
       padding: "13px 16px",
       color: C.text,
@@ -106,8 +106,8 @@ const Select = ({ value, onChange, options }) => (
     value={value}
     onChange={(e) => onChange(e.target.value)}
     style={{
-      background: C.surface,
-      border: `1px solid ${C.border}`,
+      background: "#F2F9F5",
+      border: `1.5px solid ${C.border}`,
       borderRadius: 8,
       padding: "13px 16px",
       color: C.text,
@@ -1047,7 +1047,7 @@ function RestTimer({ duration, onDone, onSkip }) {
 }
 
 // ─── STEP 2: Active Workout ───────────────────────────────────────────────────
-const REST_DURATIONS = [30, 60, 90, 120];
+const REST_DURATIONS = [0, 30, 60, 90, 120];
 
 function ActiveWorkout({ type, exercises, user, onComplete, onBack }) {
   const [checked, setChecked] = useState({});
@@ -1398,7 +1398,7 @@ function CompletionSummary({
             fontSize: 36,
             fontWeight: 900,
             margin: "0 0 6px",
-            color: pct === 100 ? "#FFD700" : C.text,
+            color: pct === 100 ? "black" : C.text,
           }}
         >
           {pct === 100
@@ -1634,14 +1634,14 @@ function ActivityRings({ logs }) {
   return (
     <div
       style={{
-        background: "#000",
+        background: "#1A2E25",
         borderRadius: 20,
         padding: "20px",
         marginBottom: 22,
         display: "flex",
         alignItems: "center",
         gap: 20,
-        border: `1px solid #1A1A1A`,
+        border: `1px solid #2A4A38`,
       }}
     >
       {/* SVG Rings */}
@@ -1818,7 +1818,7 @@ function Dashboard({ user, userName, onPickExercises, onNav }) {
             letterSpacing: "-0.01em",
           }}
         >
-          Hey, {userName.split(" ")[0]} 👋
+          Hey, {userName.split(" ")[0]}! 💪
         </h2>
         <div
           style={{
@@ -1829,9 +1829,9 @@ function Dashboard({ user, userName, onPickExercises, onNav }) {
           }}
         >
           {[
-            { label: "Streak", value: `${streak}🔥` },
-            { label: "This Week", value: thisWeek },
-            { label: "Total", value: logs.length },
+            { label: "🔥 Streak", value: streak },
+            { label: "📅 This Week", value: thisWeek },
+            { label: "🏆 Total", value: logs.length },
           ].map((s) => (
             <div
               key={s.label}
@@ -1880,7 +1880,7 @@ function Dashboard({ user, userName, onPickExercises, onNav }) {
           >
             {suggestion.emoji}
           </div>
-          <Badge label="Today's Suggestion" />
+          <Badge label="🎯 Today's Suggestion" />
           <h3
             style={{
               fontFamily: font,
@@ -1923,7 +1923,7 @@ function Dashboard({ user, userName, onPickExercises, onNav }) {
             margin: "0 0 12px",
           }}
         >
-          All Categories
+          🗂 All Categories
         </h4>
         <div
           style={{
@@ -2026,7 +2026,7 @@ function Dashboard({ user, userName, onPickExercises, onNav }) {
                   margin: "0 0 12px",
                 }}
               >
-                Recent Sessions
+                ⏱ Recent Sessions
               </h4>
               {logs.slice(0, 3).map((log, i) => {
                 const meta = CATEGORY_META[log.type] || CATEGORY_META.Custom;
@@ -2708,7 +2708,7 @@ function LogScreen({ user }) {
             margin: "0 0 20px",
           }}
         >
-          History
+          📜 Workout History
         </h2>
         {loading ? (
           <Spinner />
@@ -3051,9 +3051,9 @@ function ProfileScreen({ user, userName, onLogout }) {
             }}
           >
             {[
-              { label: "Sessions", value: logs.length },
-              { label: "Minutes", value: totalMins },
-              { label: "Exercises", value: totalEx },
+              { label: "🏋️ Sessions", value: logs.length },
+              { label: "⏱ Minutes", value: totalMins },
+              { label: "💥 Exercises", value: totalEx },
             ].map((s) => (
               <div
                 key={s.label}
@@ -3189,7 +3189,7 @@ function CalendarScreen({ user }) {
             margin: "0 0 20px",
           }}
         >
-          Calendar
+          📅 Calendar
         </h2>
 
         {/* Month navigator */}
@@ -3654,11 +3654,11 @@ function NavBar({ active, onNav }) {
       }}
     >
       {[
-        { id: "home", icon: "🏠", label: "Home" },
+        { id: "home", icon: "🏋️", label: "Home" },
         { id: "custom", icon: "⚡", label: "Mine" },
         { id: "calendar", icon: "📅", label: "Calendar" },
-        { id: "log", icon: "📋", label: "History" },
-        { id: "profile", icon: "👤", label: "Profile" },
+        { id: "log", icon: "📜", label: "History" },
+        { id: "profile", icon: "🧑‍💪", label: "Profile" },
       ].map((tab) => (
         <button
           key={tab.id}
@@ -3799,13 +3799,14 @@ export default function App() {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;800;900&family=DM+Sans:wght@400;500;700&display=swap');
         * { box-sizing: border-box; margin: 0; }
-        input, select { color: #E8EDF2 !important; }
-        input::placeholder { color: #4A5568; }
+        input, select { color: #1A2E25 !important; background: #F9FBFA !important; }
+        input::placeholder { color: #8FA99D; }
+        body { background: #EEF6F2; }
         @keyframes spin { to { transform: rotate(360deg); } }
         button:active { transform: scale(0.97); }
         ::-webkit-scrollbar { width: 4px; height: 4px; }
         ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #1E2832; border-radius: 99px; }
+        ::-webkit-scrollbar-thumb { background: #C8D8D0; border-radius: 99px; }
       `}</style>
 
       {/* Workout flow: pick → active → done */}

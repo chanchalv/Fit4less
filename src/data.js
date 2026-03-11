@@ -427,39 +427,39 @@ export const BUILT_IN_EXERCISES = {
 };
 
 export const CATEGORY_META = {
-  Push: { emoji: "💪", color: "#00D4AA" },
-  Pull: { emoji: "🏋️", color: "#FF7043" },
-  Legs: { emoji: "🦵", color: "#8B5CF6" },
-  Core: { emoji: "🔥", color: "#F59E0B" },
-  Cardio: { emoji: "🏃", color: "#EC4899" },
-  Olympic: { emoji: "🥇", color: "#3B82F6" },
-  Custom: { emoji: "⚡", color: "#00D4AA" },
+  Push: { emoji: "💪", color: "#00875A" },
+  Pull: { emoji: "🏋️", color: "#D94F00" },
+  Legs: { emoji: "🦵", color: "#6D28D9" },
+  Core: { emoji: "🔥", color: "#B45309" },
+  Cardio: { emoji: "🏃", color: "#BE185D" },
+  Olympic: { emoji: "🥇", color: "#1D4ED8" },
+  Custom: { emoji: "⚡", color: "#00875A" },
 };
 
 export const SUGGESTIONS = [
   {
     type: "Push",
-    reason: "Chest & shoulders are well-rested — great day to push heavy.",
+    reason: "💪 Chest & shoulders are well-rested — great day to push heavy!",
     emoji: "💪",
   },
   {
     type: "Pull",
-    reason: "Back and biceps need attention for balanced development.",
+    reason: "🏋️ Back and biceps need attention for balanced development.",
     emoji: "🏋️",
   },
   {
     type: "Legs",
-    reason: "Leg day! The most rewarding session you'll dread.",
+    reason: "🦵 Leg day! The most rewarding session you'll ever dread.",
     emoji: "🦵",
   },
   {
     type: "Core",
-    reason: "A focused core session improves every other lift.",
+    reason: "🔥 A strong core improves every lift — time to burn!",
     emoji: "🔥",
   },
   {
     type: "Cardio",
-    reason: "Active recovery — get that heart rate up.",
+    reason: "🏃 Active recovery — get that heart rate pumping!",
     emoji: "🏃",
   },
 ];
